@@ -8,7 +8,6 @@ import {
   Alert,
   ImageBackground,
   Image,
-  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,7 +18,6 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -28,67 +26,70 @@ export default function Login() {
       return;
     }
 
-    setLoading(true);
-
     try {
-      const response = await api.post("/auth/login", { email, password });
-      const { token, user } = response.data;
+  const res = await api.post("/auth/login", { email, password });
 
-      if (!token || !user) {
-        Alert.alert("Login Gagal", "Data login tidak valid.");
-        setLoading(false);
-        return;
+  console.log("🟢 Respons Login:", res.data);
+
+  if (res.data.status) {
+    const user = res.data.user;
+    console.log("🟢 Data user:", user);
+
+    // cek role
+    // const roleName = typeof user.role === "object" ? user.role.name : user.role;
+    // console.log("🟢 Role name:", roleName);
+
+    // try {
+    //   const res = await api.post("/auth/login", { email, password });
+
+    //   if (res.data.status) {
+    //     const user = res.data.user;
+
+    //     // pastikan ada role
+    //     if (!user?.role) {
+    //       Alert.alert("Error", "Role user tidak ditemukan!");
+    //       return;
+    //     }
+
+       // Ambil nama role dari user
+let roleName = "";
+
+if (Array.isArray(user.roles) && user.roles.length > 0) {
+  roleName = user.roles[0].name; // dari array roles
+} else if (user.role) {
+  roleName = typeof user.role.name === "object" ? user.role.name : user.role;
+}
+
+const role = roleName.toLowerCase();
+console.log("🟢 Role login:", role);
+
+// Cek role yang boleh login
+if (!["agen", "administrator", "admin", "kurir"].includes(role)) {
+  Alert.alert("Gagal", `Role ${role} tidak diizinkan login!`);
+  return;
+}
+
+// Simpan token dan user
+await AsyncStorage.setItem("token", res.data.token);
+await AsyncStorage.setItem("user", JSON.stringify(user));
+
+// Redirect sesuai role
+if (role === "agen") {
+  router.replace("/");
+} else if (role === "administrator" || role === "admin") {
+  router.replace("/admin");
+} else if (role === "kurir") {
+  router.replace("/kurir");
+}
+
+
+        console.log("Role user:", roleName);
+      } else {
+        Alert.alert("Gagal", res.data.message || "Email atau password salah");
       }
-
-      // Simpan token & user di AsyncStorage
-      await AsyncStorage.setItem("token", token);
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-
-      // ✅ Deteksi role dengan aman
-      let role = "";
-
-      if (typeof user.role === "string") {
-        role = user.role.toLowerCase();
-      } else if (Array.isArray(user.role) && user.role.length > 0) {
-        role = String(user.role[0]).toLowerCase();
-      } else if (Array.isArray(user.roles) && user.roles.length > 0) {
-        const firstRole = user.roles[0];
-        role =
-          typeof firstRole === "string"
-            ? firstRole.toLowerCase()
-            : firstRole?.name?.toLowerCase() || "";
-      } else if (typeof user.role === "object" && user.role !== null) {
-        role = user.role.name?.toLowerCase() || "";
-      }
-
-      console.log("🧩 Role terdeteksi:", role);
-
-      Alert.alert("Berhasil", `Selamat datang, ${user?.name || "User"}!`);
-
-      // 🔁 Redirect sesuai role
-      setTimeout(() => {
-        if (role === "kurir") {
-          router.replace("/kurir");
-        }
-        //  else if (role === "admin" || role === "administrator") {
-        //   router.replace("/admin/dashboard");
-        // } 
-        else if (role === "agen") {
-          router.replace("/");
-        } else {
-          Alert.alert("Error", `Role '${role}' belum memiliki halaman.`);
-        }
-      }, 1000);
-    } catch (error: any) {
-      console.log("❌ Login Error:", error?.response?.data || error.message);
-
-      const msg =
-        error?.response?.data?.message ||
-        "Email atau password salah, coba lagi.";
-
-      Alert.alert("Login Gagal", msg);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Tidak bisa konek ke server");
     }
   };
 
@@ -105,7 +106,7 @@ export default function Login() {
         />
 
         <Text style={styles.title}>
-          Masuk ke <Text style={styles.brand}>Aplikasi</Text>
+          Masuk ke <Text style={styles.brand}>Kurir</Text>
         </Text>
 
         {/* Email */}
@@ -148,16 +149,8 @@ export default function Login() {
         </View>
 
         {/* Button */}
-        <TouchableOpacity
-          style={[styles.button, loading && { opacity: 0.7 }]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
+        <TouchableOpacity style={styles.button} onPress={handleLogin}>
+          <Text style={styles.buttonText}>Login</Text>
         </TouchableOpacity>
       </View>
     </ImageBackground>

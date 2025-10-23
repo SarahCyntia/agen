@@ -26,6 +26,10 @@ export default function RootLayout() {
         name="index"
         options={{ title: "🏠 Dashboard" }}
       />
+      <Drawer.Screen
+        name="/admin/admin"
+        options={{ title: "🏠 Dashboard Admin" }}
+      />
       {/* <Drawer.Screen
         name="dashboard"
         options={{ title: "🏠 Dashboard" }}
@@ -49,6 +53,8 @@ export default function RootLayout() {
       <Drawer.Screen name="ganti" options={{ drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="login" options={{ drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="home/index" options={{ drawerItemStyle: { display: "none" } }} />
+      <Drawer.Screen name="admin/index" options={{ drawerItemStyle: { display: "none" } }} />
+      <Drawer.Screen name="logout" options={{ title: "🚪 Logout" }} />
     </Drawer>
   );
 }

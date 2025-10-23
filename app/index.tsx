@@ -1,15 +1,19 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
-  Animated,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import Data from "./data";
+import Input from "./agen/input";
 import Dashboard from "./dashboard";
-import Input from "./input";
+import Data from "./data";
 import Logout from "./logout";
+// import RoleList from "@/screens/RoleList";
+// import RoleInfo from "@/screens/RoleInfo";
+
+
 
 export default function HomeScreen() {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -28,19 +32,36 @@ export default function HomeScreen() {
   };
 
   const renderContent = () => {
-    switch (activeMenu) {
-      case "dashboard":
-        return <Dashboard />;
-      case "data":
-        return <Data />;
-      case "input":
-        return <Input />;
-      case "logout":
-        return <Logout />;
-      default:
-        return <Dashboard />;
-    }
-  };
+  switch (activeMenu) {
+    case "dashboard":
+      return <Dashboard />;
+    case "data":
+      return <Data />;
+    case "input":
+      return <Input />;
+    // case "rolelist": // 🆕 tambahkan ini
+    //   return <RoleList />;
+    case "logout":
+      return <Logout />;
+    default:
+      return <Dashboard />;
+  }
+};
+
+  // const renderContent = () => {
+  //   switch (activeMenu) {
+  //     case "dashboard":
+  //       return <Dashboard />;
+  //     case "data":
+  //       return <Data />;
+  //     case "input":
+  //       return <Input />;
+  //     case "logout":
+  //       return <Logout />;
+  //     default:
+  //       return <Dashboard />;
+  //   }
+  // };
 
   return (
     <View style={styles.container}>
@@ -77,6 +98,15 @@ export default function HomeScreen() {
                 ➕ Input Order
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setActiveMenu("rolelist")}>
+  <Text
+    style={[styles.menu, activeMenu === "rolelist" && styles.active]}
+  >
+    👥 Role List
+  </Text>
+</TouchableOpacity>
+
 
             <TouchableOpacity onPress={() => setActiveMenu("logout")}>
               <Text

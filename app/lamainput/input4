@@ -1,0 +1,541 @@
+import api from "@/app-example/constants/api";
+import * as FileSystem from "expo-file-system";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ScrollView,
+} from "react-native";
+import Icon from "react-native-vector-icons/FontAwesome";
+
+// ---- Typings ----
+interface Input {
+  id: number;
+  nama_pengirim: string;
+  alamat_pengirim: string;
+  no_telp_pengirim: string;
+  nama_penerima: string;
+  alamat_penerima: string;
+  no_telp_penerima: string;
+  jenis_barang: string;
+  berat_barang: number;
+  ekspedisi: string;
+  jenis_layanan: string;
+  no_resi: string;
+  biaya: number;
+  status: string;
+}
+
+// ---- Komponen tabel ----
+const PaginateTable = React.forwardRef(({ input = "" }: { input?: string }, ref: any) => {
+  const [data, setData] = useState<Input[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchData = async () => {
+    if (!input) return;
+    try {
+      setLoading(true);
+      const res = await api.post("/input");
+      const result = Array.isArray(res.data) ? res.data : res.data.data ?? [];
+      setData(result);
+    } catch (err) {
+      console.error("Gagal load data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useImperativeHandle(ref, () => ({
+    refetch: fetchData,
+  }));
+
+  useEffect(() => {
+    fetchData();
+  }, [input]);
+
+  const renderItem = ({ item, index }: { item: Input; index: number }) => (
+    <View style={styles.row}>
+      <Text style={[styles.cell, styles.colNo]}>{index + 1}</Text>
+      <Text style={[styles.cell, styles.colNama]} numberOfLines={1} ellipsizeMode="tail">
+        {item.nama_pengirim}
+      </Text>
+      <Text style={[styles.cell, styles.colNama]} numberOfLines={1} ellipsizeMode="tail">
+        {item.nama_penerima}
+      </Text>
+      <Text style={[styles.cell, styles.colResi]} numberOfLines={1} ellipsizeMode="tail">
+        {item.no_resi}
+      </Text>
+      <Text style={[styles.cell, styles.colStatus]} numberOfLines={1} ellipsizeMode="tail">
+        {item.status}
+      </Text>
+    </View>
+  );
+
+  if (loading) return <ActivityIndicator style={{ margin: 20 }} />;
+
+  if (data.length === 0)
+    return <Text style={{ textAlign: "center", margin: 20 }}>Tidak ada data</Text>;
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View>
+        <View style={[styles.row, styles.header]}>
+          <Text style={[styles.headerText, styles.colNo]}>No</Text>
+          <Text style={[styles.headerText, styles.colNama]}>Pengirim</Text>
+          <Text style={[styles.headerText, styles.colNama]}>Penerima</Text>
+          <Text style={[styles.headerText, styles.colResi]}>No Resi</Text>
+          <Text style={[styles.headerText, styles.colStatus]}>Status</Text>
+        </View>
+
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderItem}
+        />
+      </View>
+    </ScrollView>
+  );
+});
+
+// ---- Komponen form input ----
+const FormInput: React.FC<{
+  setShowForm: (v: boolean) => void;
+  onSuccess: () => void;
+}> = ({ setShowForm, onSuccess }) => {
+  const [values, setValues] = useState<any>({});
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
+
+  const handleChange = (key: string, value: string) => {
+    setValues((prev: any) => ({ ...prev, [key]: value }));
+  };
+
+  const onSubmit = async () => {
+    try {
+      setLoadingSubmit(true);
+
+      const noResi = `RESI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      const payload = {
+        nama_pengirim: values.nama_pengirim,
+        alamat_pengirim: values.alamat_pengirim,
+        no_telp_pengirim: values.no_telp_pengirim,
+        nama_penerima: values.nama_penerima,
+        alamat_penerima: values.alamat_penerima,
+        no_telp_penerima: values.no_telp_penerima,
+        nama_barang: values.nama_barang,
+        berat_barang: Number(values.berat_barang) || 0,
+        ekspedisi: values.ekspedisi,
+        jenis_layanan: values.jenis_layanan,
+        no_resi: noResi,
+        biaya: 0,
+        status: "menunggu",
+      };
+
+      await api.post("/input", payload);
+
+      Alert.alert("Berhasil", `Transaksi tersimpan!\nNo Resi: ${noResi}`);
+      onSuccess(); // refresh tabel dan balik
+    } catch (err) {
+      console.warn("Submit error:", err);
+      Alert.alert("Error", "Gagal menyimpan transaksi");
+    } finally {
+      setLoadingSubmit(false);
+    }
+  };
+
+  return (
+    <ScrollView style={styles.formContainer}>
+      <Text style={styles.formTitle}>Tambah Transaksi</Text>
+
+      {[
+        ["nama_pengirim", "Nama Pengirim"],
+        ["alamat_pengirim", "Alamat Pengirim"],
+        ["no_telp_pengirim", "No Telp Pengirim"],
+        ["nama_penerima", "Nama Penerima"],
+        ["alamat_penerima", "Alamat Penerima"],
+        ["no_telp_penerima", "No Telp Penerima"],
+        ["nama_barang", "Nama Barang"],
+        ["berat_barang", "Berat Barang"],
+        ["ekspedisi", "Ekspedisi"],
+        ["jenis_layanan", "Jenis Layanan"],
+      ].map(([key, label]) => (
+        <View key={key} style={styles.inputGroup}>
+          <Text style={styles.label}>{label}</Text>
+          <TextInput
+            style={styles.input}
+            value={values[key] || ""}
+            onChangeText={(t) => handleChange(key, t)}
+            placeholder={label}
+          />
+        </View>
+      ))}
+
+      <View style={styles.formButtons}>
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: "#6c757d" }]}
+          onPress={() => setShowForm(false)}
+        >
+          <Text style={styles.btnText}>Batal</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: "#0d6efd" }]}
+          onPress={onSubmit}
+          disabled={loadingSubmit}
+        >
+          <Text style={styles.btnText}>
+            {loadingSubmit ? "Menyimpan..." : "Simpan"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+};
+
+// ---- Main component ----
+const InputOrders: React.FC = () => {
+  const paginateRef = useRef<any>(null);
+  const [showForm, setShowForm] = useState(false);
+
+  const refresh = () => paginateRef.current?.refetch?.();
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.headerBar}>
+        <Text style={styles.title}>Halaman Data Input</Text>
+
+        {!showForm && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowForm(true)}
+          >
+            <Text style={styles.addButtonText}>Tambah</Text>
+            <Icon name="plus" size={16} color="#fff" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {!showForm ? (
+        <PaginateTable ref={paginateRef} input="/input" />
+      ) : (
+        <FormInput
+          setShowForm={setShowForm}
+          onSuccess={() => {
+            refresh();
+            setShowForm(false);
+          }}
+        />
+      )}
+    </View>
+  );
+};
+
+export default InputOrders;
+
+// ---- Styles ----
+const styles = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 16,
+  },
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  addButton: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0d6efd",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+
+  // ===== TABLE =====
+  row: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    alignItems: "center",
+    minHeight: 40,
+  },
+  header: {
+    backgroundColor: "#f5f5f5",
+    borderTopWidth: 1,
+    borderTopColor: "#ddd",
+  },
+  cell: {
+    fontSize: 13,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRightWidth: 1,
+    borderRightColor: "#ddd",
+    borderLeftWidth: 1,
+    borderLeftColor: "#ddd",
+    textAlign: "center",
+    textAlignVertical: "center",
+    flexWrap: "nowrap",
+  },
+  headerText: {
+    fontWeight: "bold",
+    textAlign: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+    borderLeftWidth: 1,
+    borderLeftColor: "#ccc",
+    flexWrap: "nowrap",
+  },
+  colNo: { width: 40 },
+  colNama: { width: 120 },
+  colResi: { width: 150 },
+  colStatus: { width: 100 },
+
+  // ===== FORM =====
+  formContainer: { flex: 1 },
+  formTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
+  inputGroup: { marginBottom: 10 },
+  label: { fontSize: 14, marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    padding: 8,
+  },
+  formButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  btn: {
+    flex: 1,
+    padding: 10,
+    marginHorizontal: 5,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  btnText: { color: "#fff", fontWeight: "bold" },
+});
+
+
+// import React, { useEffect, useRef, useState } from "react";
+// import {
+//   View,
+//   Text,
+//   TouchableOpacity,
+//   FlatList,
+//   ActivityIndicator,
+//   StyleSheet,
+//   Alert,
+// } from "react-native";
+// import api from "@/app-example/constants/api";
+// // import axios from "axios";
+// import * as FileSystem from "expo-file-system";
+// import Icon from "react-native-vector-icons/FontAwesome";
+// import Fomm from "../app/formm";
+
+// // ---- Typings ----
+// interface Input {
+//   id: number;
+//   nama_pengirim: string;
+//   alamat_pengirim: string;
+//   no_telp_pengirim: string;
+//   nama_penerima: string;
+//   alamat_penerima: string;
+//   no_telp_penerima: string;
+//   jenis_barang: string;
+//   berat_barang: number;
+//   ekspedisi: string;
+//   jenis_layanan: string;
+//   no_resi: string;
+//   biaya: number;
+//   status: string;
+//   status_pembayaran?: string;
+//   payment_at?: string;
+// }
+
+// // ---- Komponen tabel versi FlatList ----
+// const PaginateTable = React.forwardRef(
+//   ({ input = "" }: { input?: string }, ref: any) => {
+//     const [data, setData] = useState<Input[]>([]);
+//     const [loading, setLoading] = useState(false);
+
+//     const fetchData = async () => {
+//       if (!input) return;
+//       try {
+//         setLoading(true);
+//         const res = await api.post("/input");
+//         const result = Array.isArray(res.data) ? res.data : res.data.data ?? [];
+//         setData(result);
+//       } catch (err) {
+//         console.error("Gagal load data:", err);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+
+//     React.useImperativeHandle(ref, () => ({
+//       refetch: fetchData,
+//     }));
+
+//     useEffect(() => {
+//       fetchData();
+//     }, [input]);
+
+//     const renderItem = ({ item, index }: { item: Input; index: number }) => (
+//       <View style={styles.row}>
+//         <Text style={styles.cell}>{index + 1}</Text>
+//         <Text style={styles.cell}>{item.nama_pengirim}</Text>
+//         <Text style={styles.cell}>{item.nama_penerima}</Text>
+//         <Text style={styles.cell}>{item.no_resi}</Text>
+//         <Text style={styles.cell}>{item.status}</Text>
+//       </View>
+//     );
+
+//     if (loading) return <ActivityIndicator style={{ margin: 20 }} />;
+
+//     if (data.length === 0)
+//       return (
+//         <Text style={{ textAlign: "center", margin: 20 }}>Tidak ada data</Text>
+//       );
+
+//     return (
+//       <FlatList
+//         data={data}
+//         keyExtractor={(item) => item.id.toString()}
+//         ListHeaderComponent={() => (
+//           <View style={[styles.row, styles.header]}>
+//             <Text style={styles.headerText}>No</Text>
+//             <Text style={styles.headerText}>Pengirim</Text>
+//             <Text style={styles.headerText}>Penerima</Text>
+//             <Text style={styles.headerText}>No Resi</Text>
+//             <Text style={styles.headerText}>Status</Text>
+//           </View>
+//         )}
+//         renderItem={renderItem}
+//       />
+//     );
+//   }
+// );
+
+// const InputOrders: React.FC = () => {
+//   const paginateRef = useRef<any>(null);
+//   const [loadingCity, setLoadingCity] = useState(false);
+//   const [showForm, setShowForm] = useState(false); // <- NEW
+
+//   const refresh = () => paginateRef.current?.refetch?.();
+
+//   const downloadReceipt = async (noResi: string) => {
+//     try {
+//       setLoadingCity(true);
+//       const uri = `/download-resi/${noResi}`;
+//       const fileUri = FileSystem.documentDirectory + `struk-${noResi}.pdf`;
+//       const { uri: localUri } = await FileSystem.downloadAsync(uri, fileUri);
+//       console.log("File downloaded to:", localUri);
+//       Alert.alert("Berhasil", "Struk berhasil diunduh");
+//     } catch (error) {
+//       console.error("Download gagal:", error);
+//       Alert.alert("Error", "Gagal mengunduh struk");
+//     } finally {
+//       setLoadingCity(false);
+//     }
+//   };
+
+//   const redirectToPayment = (id: number) => {
+//     console.log("Payment clicked for id:", id);
+//   };
+
+//   return (
+//     <View style={styles.card}>
+//       {/* Header */}
+//       <View style={styles.headerBar}>
+//         <Text style={styles.title}>Halaman Data Input</Text>
+
+//         <TouchableOpacity
+//           style={styles.addButton}
+//           onPress={() => setShowForm(true)} // <- NEW
+//         >
+//           <Text style={styles.addButtonText}>Tambah</Text>
+//           <Icon name="plus" size={16} color="#fff" style={{ marginLeft: 4 }} />
+//         </TouchableOpacity>
+//       </View>
+
+//       {/* Body */}
+//       {!showForm ? (
+//         <PaginateTable ref={paginateRef} input="/input" />
+//       ) : (
+//         <Fomm loadingCity={loadingCity} />
+//       )}
+//     </View>
+//   );
+// };
+
+// export default InputOrders;
+
+// // ---- Styles ----
+// const styles = StyleSheet.create({
+//   card: {
+//     flex: 1,
+//     backgroundColor: "#fff",
+//     padding: 16,
+//   },
+//   headerBar: {
+//     flexDirection: "row",
+//     alignItems: "center",
+//     marginBottom: 12,
+//   },
+//   title: {
+//     fontSize: 18,
+//     fontWeight: "bold",
+//   },
+//   addButton: {
+//     marginLeft: "auto",
+//     flexDirection: "row",
+//     alignItems: "center",
+//     backgroundColor: "#0d6efd",
+//     paddingHorizontal: 12,
+//     paddingVertical: 6,
+//     borderRadius: 6,
+//   },
+//   addButtonText: {
+//     color: "#fff",
+//     fontWeight: "600",
+//   },
+//   row: {
+//     flexDirection: "row",
+//     paddingVertical: 8,
+//     borderBottomWidth: 1,
+//     borderBottomColor: "#ddd",
+//   },
+//   cell: {
+//     flex: 1,
+//     paddingHorizontal: 4,
+//     fontSize: 14,
+//   },
+//   header: {
+//     backgroundColor: "#eee",
+//   },
+//   headerText: {
+//     flex: 1,
+//     fontWeight: "bold",
+//     paddingHorizontal: 4,
+//   },
+// });

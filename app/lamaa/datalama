@@ -1,0 +1,275 @@
+import api from "@/app-example/constants/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  View,
+  Text,
+  Button,
+  Modal,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
+import React, { useEffect, useState } from "react";
+
+interface Riwayat {
+  id: number;
+  deskripsi: string;
+  created_at: string;
+}
+
+interface Order {
+  id: number;
+  nama_pengirim: string;
+  alamat_pengirim: string;
+  nama_penerima: string;
+  alamat_penerima: string;
+  no_resi: string;
+  status: string;
+  riwayat: Riwayat[];
+}
+
+export default function DataOrder() {
+  const [loading, setLoading] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  // modal riwayat
+  const [riwayatVisible, setRiwayatVisible] = useState(false);
+  const [riwayatData, setRiwayatData] = useState<Riwayat[]>([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem("token");
+
+      const res = await api.post("/input", null, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setOrders(res.data.data || []);
+    } catch (err: any) {
+      console.error("❌ Gagal ambil data:", err.response?.data || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // format tanggal Indonesia
+  const formatDate = (waktu: string) => {
+    const date = new Date(waktu);
+    return date.toLocaleString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // buka modal riwayat
+  const openRiwayat = (riwayat: Riwayat[]) => {
+    setRiwayatData(riwayat);
+    setRiwayatVisible(true);
+  };
+
+  const renderRow = ({ item, index }: { item: Order; index: number }) => (
+    <View style={styles.row}>
+      <Text style={[styles.cell, { flex: 0.3 }]}>{index + 1}</Text>
+      <Text style={[styles.cell, { flex: 1 }]}>{item.nama_pengirim}</Text>
+      <Text style={[styles.cell, { flex: 1.5 }]}>{item.alamat_pengirim}</Text>
+      <Text style={[styles.cell, { flex: 1 }]}>{item.nama_penerima}</Text>
+      <Text style={[styles.cell, { flex: 1.5 }]}>{item.alamat_penerima}</Text>
+      <Text style={[styles.cell, { flex: 1 }]}>{item.no_resi}</Text>
+
+      {/* Status */}
+      <View style={[styles.cell, { flex: 0.8, alignItems: "center" }]}>
+        <Text
+          style={[
+            item.status === "selesai" ? styles.done : styles.pending,
+          ]}
+        >
+          {item.status}
+        </Text>
+      </View>
+
+      {/* Riwayat */}
+      <View style={[styles.cell, { flex: 1, alignItems: "center" }]}>
+        {Array.isArray(item.riwayat) && item.riwayat.length > 0 ? (
+          <TouchableOpacity
+            style={styles.buttonRiwayat}
+            onPress={() => openRiwayat(item.riwayat)}
+          >
+            <Text style={styles.buttonText}>Lihat Riwayat</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={{ fontStyle: "italic", color: "#777" }}>
+            Belum ada riwayat
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>📋 Halaman Data Input</Text>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#0000ff" />
+      ) : orders.length > 0 ? (
+        <ScrollView horizontal>
+          <View style={{ flex: 1 }}>
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <Text style={styles.headerCell}>No</Text>
+              <Text style={styles.headerCell}>Pengirim</Text>
+              <Text style={styles.headerCell}>Alamat Pengirim</Text>
+              <Text style={styles.headerCell}>Penerima</Text>
+              <Text style={styles.headerCell}>Alamat Penerima</Text>
+              <Text style={styles.headerCell}>No Resi</Text>
+              <Text style={styles.headerCell}>Status</Text>
+              <Text style={styles.headerCell}>Riwayat</Text>
+            </View>
+
+            {/* Data */}
+            <FlatList
+              data={orders}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderRow}
+            />
+          </View>
+        </ScrollView>
+      ) : (
+        <Text>Tidak ada data</Text>
+      )}
+
+      {/* Modal Riwayat */}
+      <Modal
+        visible={riwayatVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRiwayatVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Detail Riwayat</Text>
+
+            <FlatList
+              data={riwayatData}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item, index }) => (
+                <View style={styles.riwayatItem}>
+                  <Text>
+                    {index + 1}. {item.deskripsi}
+                  </Text>
+                  <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+                </View>
+              )}
+            />
+
+            <Button title="Tutup" onPress={() => setRiwayatVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: "#fff",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  headerRow: {
+    flexDirection: "row",
+    borderBottomWidth: 2,
+    borderBottomColor: "#444",
+    paddingVertical: 8,
+    backgroundColor: "#f1f1f1",
+  },
+  headerCell: {
+    flex: 1,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    paddingVertical: 8,
+  },
+  cell: {
+    paddingHorizontal: 6,
+    justifyContent: "center",
+    textAlign: "center",
+  },
+  done: {
+    backgroundColor: "green",
+    color: "white",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    textAlign: "center",
+    minWidth: 70,
+  },
+  pending: {
+    backgroundColor: "orange",
+    color: "white",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    textAlign: "center",
+    minWidth: 70,
+  },
+  buttonRiwayat: {
+    backgroundColor: "#f4a261",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    marginHorizontal: 4,
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    margin: 20,
+    padding: 20,
+    borderRadius: 10,
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  riwayatItem: {
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    paddingBottom: 5,
+  },
+  date: { fontSize: 12, color: "gray" },
+});

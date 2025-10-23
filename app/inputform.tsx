@@ -1,201 +1,400 @@
-import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import * as Yup from "yup";
-import axios from "axios";
-import Swal from "sweetalert2";
-import { toast } from "react-toastify";
-// import InputForm from "inputform";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  Alert,
+  ScrollView,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Picker } from "@react-native-picker/picker";
+import Toast from "react-native-toast-message";
+import api from "@/app-example/constants/api";
 
-interface Province { id: string; name: string }
-interface City { id: string; name: string }
-interface District { id: string; name: string }
-interface Service { service: string; description: string; cost: number; etd: string }
 
-const couriers = [
-  { code: "jne", name: "JNE" },
-  { code: "tiki", name: "TIKI" },
-  { code: "pos", name: "POS" },
-];
+export default function InputForm() {
+  const router = useRouter();
+  const [form, setForm] = useState({
+    // Data Pengirim
+    nama_pengirim: "",
+    alamat_pengirim: "",
+    no_telp_pengirim: "",
+    provinsi_asal: "",
+    kota_asal: "",
+    kecamatan_asal: "",
 
-const schema = Yup.object().shape({
-  nama_pengirim: Yup.string().required("Nama Pengirim harus diisi"),
-  alamat_pengirim: Yup.string().required("Alamat Pengirim harus diisi"),
-  no_telp_pengirim: Yup.string().required("No. Telp Pengirim harus diisi"),
-  nama_penerima: Yup.string().required("Nama Penerima harus diisi"),
-  alamat_penerima: Yup.string().required("Alamat Penerima harus diisi"),
-  no_telp_penerima: Yup.string().required("No. Telp Penerima harus diisi"),
-  ekspedisi: Yup.string().required("Ekspedisi harus dipilih"),
-  jenis_barang: Yup.string().required("Jenis Barang harus diisi"),
-  jenis_layanan: Yup.string().required("Jenis Layanan harus diisi"),
-  berat_barang: Yup.number().required().min(0.1, "Berat minimal 0.1 Kg"),
-});
+    // Data Penerima
+    nama_penerima: "",
+    alamat_penerima: "",
+    no_telp_penerima: "",
+    provinsi_tujuan: "",
+    kota_tujuan: "",
+    kecamatan_tujuan: "",
 
-export default function InputForm({ selected, onClose, onRefresh }: { selected?: string, onClose: () => void, onRefresh: () => void }) {
-  const { register, handleSubmit, formState: { errors }, setValue, reset } = useForm({
-    resolver: yupResolver(schema),
+    // Data Barang
+    jenis_barang: "",
+    berat_barang: "",
+    ekspedisi: "",
+    jenis_layanan: "",
   });
 
-  const [provinces, setProvinces] = useState<Province[]>([]);
-  const [citiesOrigin, setCitiesOrigin] = useState<City[]>([]);
-  const [citiesDestination, setCitiesDestination] = useState<City[]>([]);
-  const [districtsOrigin, setDistrictsOrigin] = useState<District[]>([]);
-  const [districtsDestination, setDistrictsDestination] = useState<District[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [selectedCourier, setSelectedCourier] = useState("");
-  const [selectedService, setSelectedService] = useState("");
-  const [biaya, setBiaya] = useState<number>(0);
+  const [provinces, setProvinces] = useState<any[]>([]);
+  const [citiesOrigin, setCitiesOrigin] = useState<any[]>([]);
+  const [citiesDestination, setCitiesDestination] = useState<any[]>([]);
+  const [districtsOrigin, setDistrictsOrigin] = useState<any[]>([]);
+  const [districtsDestination, setDistrictsDestination] = useState<any[]>([]);
 
-  const [provinceOrigin, setProvinceOrigin] = useState("0");
-  const [cityOrigin, setCityOrigin] = useState("");
-  const [districtOrigin, setDistrictOrigin] = useState("");
-  const [provinceDestination, setProvinceDestination] = useState("0");
-  const [cityDestination, setCityDestination] = useState("");
-  const [districtDestination, setDistrictDestination] = useState("");
-  const [beratBarang, setBeratBarang] = useState<number | null>(null);
+  // --- API CALLS ---
+  const fetchProvinces = async () => {
+    try {
+      const res = await api.get("/provinces");
+      const formatted = Object.entries(res.data).map(([id, name]) => ({
+        id: String(id),
+        title: String(name),
+      }));
+      setProvinces(formatted);
+    } catch {
+      Toast.show({ type: "error", text1: "Gagal mengambil provinsi" });
+    }
+  };
 
+  const fetchCities = async (
+    provId: string,
+    type: "origin" | "destination"
+  ) => {
+    try {
+      const res = await api.get(`/cities/${provId}`);
+      const formatted = Object.entries(res.data).map(([id, name]) => ({
+        id: String(id),
+        title: String(name),
+      }));
+      if (type === "origin") setCitiesOrigin(formatted);
+      else setCitiesDestination(formatted);
+    } catch {
+      Toast.show({ type: "error", text1: "Gagal mengambil kota" });
+    }
+  };
+
+  const fetchDistricts = async (
+    cityId: string,
+    type: "origin" | "destination"
+  ) => {
+    try {
+      const res = await api.get(`/districts/${cityId}`);
+      const formatted = Object.entries(res.data).map(([id, name]) => ({
+        id: String(id),
+        title: String(name),
+      }));
+      if (type === "origin") setDistrictsOrigin(formatted);
+      else setDistrictsDestination(formatted);
+    } catch {
+      Toast.show({ type: "error", text1: "Gagal mengambil kecamatan" });
+    }
+  };
+
+  // --- HOOKS ---
   useEffect(() => {
-    axios.get("/provinces").then(res => {
-      const provs = Object.entries(res.data).map(([id, name]) => ({ id, name: name as string }));
-      setProvinces(provs);
-    });
+    fetchProvinces();
   }, []);
 
-  const fetchCities = async (provId: string, type: "origin" | "destination") => {
-    if (!provId || provId === "0") return;
-    const res = await axios.get(`/cities/${provId}`);
-    const data = Object.entries(res.data).map(([id, name]) => ({ id, name: name as string }));
-    if (type === "origin") setCitiesOrigin(data); else setCitiesDestination(data);
+  const handleChange = (name: string, value: string) => {
+    setForm({ ...form, [name]: value });
   };
 
-  const fetchDistricts = async (cityId: string, type: "origin" | "destination") => {
-    if (!cityId) return;
-    const res = await axios.get(`/districts/${cityId}`);
-    const data = Object.entries(res.data).map(([id, name]) => ({ id, name: name as string }));
-    if (type === "origin") setDistrictsOrigin(data); else setDistrictsDestination(data);
-  };
+  // const handleSubmit = async () => {
+  //   try {
+  //     const noResi = `RESI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  const fetchOngkir = async () => {
-    if (!districtOrigin || !districtDestination || !selectedCourier || !beratBarang) return;
-    try {
-      const res = await axios.post("/cost", {
-        origin: districtOrigin,
-        destination: districtDestination,
-        weight: Math.round(beratBarang * 1000),
-        courier: selectedCourier,
-        price: "lowest"
-      });
-      const sv = res.data.map((s: any) => ({
-        service: s.service,
-        description: s.description,
-        cost: s.cost,
-        etd: s.etd,
-      }));
-      setServices(sv);
-      setSelectedService("");
-      setBiaya(0);
-    } catch {
-      toast.error("Gagal mengambil ongkir");
-    }
-  };
+  //     const payload = {
+  //       ...form,
+  //       berat_barang: parseFloat(form.berat_barang),
+  //       no_resi: noResi,
+  //       biaya: 0,
+  //       status: "menunggu",
+  //     };
 
-  useEffect(() => {
-    fetchOngkir();
-  }, [districtOrigin, districtDestination, selectedCourier, beratBarang]);
+  //     const res = await fetch("/input/store", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify(payload),
+  //     });
 
-  const onSubmit = async (data: any) => {
-    const noResi = generateNoResi();
-    const formData = new FormData();
-    formData.append("nama_pengirim", data.nama_pengirim);
-    formData.append("asal_provinsi_id", provinceOrigin);
-    formData.append("asal_kota_id", cityOrigin);
-    formData.append("asal_kecamatan_id", districtOrigin);
-    formData.append("alamat_pengirim", data.alamat_pengirim);
-    formData.append("no_telp_pengirim", data.no_telp_pengirim);
-    formData.append("nama_penerima", data.nama_penerima);
-    formData.append("tujuan_provinsi_id", provinceDestination);
-    formData.append("tujuan_kota_id", cityDestination);
-    formData.append("tujuan_kecamatan_id", districtDestination);
-    formData.append("alamat_penerima", data.alamat_penerima);
-    formData.append("no_telp_penerima", data.no_telp_penerima);
-    formData.append("jenis_barang", data.jenis_barang);
-    formData.append("jenis_layanan", selectedService);
-    formData.append("ekspedisi", selectedCourier);
-    formData.append("berat_barang", beratBarang?.toString() || "0");
-    formData.append("biaya", biaya.toString());
-    formData.append("no_resi", noResi);
-    if (selected) formData.append("_method", "PUT"); else formData.append("status", "menunggu");
+  //     if (!res.ok) {
+  //       const errorData = await res.json();
+  //       throw new Error(errorData.message || "Gagal simpan data");
+  //     }
 
-    try {
-      await axios.post(selected ? `/input/${selected}` : "/input/store", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      Swal.fire({
-        icon: "success",
-        title: "Berhasil!",
-        html: `
-          <div style="text-align:left">
-            <p><strong>No. Resi:</strong> ${noResi}</p>
-            <p><strong>Biaya Pengiriman:</strong> Rp ${biaya.toLocaleString("id-ID")}</p>
-            <p><strong>Ekspedisi:</strong> ${selectedCourier.toUpperCase()}</p>
-          </div>`
-      }).then(() => {
-        onClose();
-        onRefresh();
-        toast.success("Data berhasil disimpan");
-        reset();
-      });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Terjadi kesalahan.");
-    }
-  };
+  //     Alert.alert("Berhasil", `No Resi: ${noResi}`, [
+  //       { text: "OK", onPress: () => router.push("/input") },
+  //     ]);
+  //   } catch (err: any) {
+  //     Alert.alert("Error", err.message || "Terjadi kesalahan");
+  //   }
+  // };
 
-  function generateNoResi() {
-    const prefix = "RESI";
-    const timestamp = Date.now().toString();
-    const random = Math.floor(1000 + Math.random() * 9000);
-    return `${prefix}-${timestamp}-${random}`;
+
+
+  const handleSubmit = async () => {
+  try {
+    const noResi = `RESI-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const payload = {
+      nama_pengirim: form.nama_pengirim,
+      alamat_pengirim: form.alamat_pengirim,
+      no_telp_pengirim: form.no_telp_pengirim,
+      asal_provinsi_id: form.provinsi_asal,
+      asal_kota_id: form.kota_asal,
+      asal_kecamatan_id: form.kecamatan_asal,
+
+      nama_penerima: form.nama_penerima,
+      alamat_penerima: form.alamat_penerima,
+      no_telp_penerima: form.no_telp_penerima,
+      tujuan_provinsi_id: form.provinsi_tujuan,
+      tujuan_kota_id: form.kota_tujuan,
+      tujuan_kecamatan_id: form.kecamatan_tujuan,
+
+      jenis_barang: form.jenis_barang,
+      berat_barang: parseFloat(form.berat_barang),
+      ekspedisi: form.ekspedisi,
+      jenis_layanan: form.jenis_layanan,
+
+      biaya: 0,
+      status: "menunggu",
+    };
+
+    // pakai axios instance biar baseURL benar
+    // const res = await api.post("/input/store", payload);
+    // const res = await api.post("/input", payload);
+    await api.post("input/store", payload);
+              
+console.log("POST to:", api.defaults.baseURL + "/input/store");
+console.log("Payload:", payload);
+
+
+    Alert.alert("Berhasil", `No Resi: ${res.data.data.no_resi}`, [
+      { text: "OK", onPress: () => router.push("/input") },
+    ]);
+  } catch (err) {
+    console.error(err);
+    Alert.alert("Error", err.response?.data?.message || "Terjadi kesalahan");
   }
+};
 
+// useEffect(() => {
+//   ambilData();
+// }, []);
+
+// const ambilData = async () => {
+//   const res = await api.get("input");
+//   setData(res.data.data);
+// };
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="p-4 bg-white shadow rounded-xl space-y-4">
-      <h2 className="text-xl font-bold">{selected ? "Edit" : "Tambah"} Input</h2>
-      <div>
-        <label>Nama Pengirim</label>
-        <input {...register("nama_pengirim")} className="form-input" />
-        <p className="text-red-500">{errors.nama_pengirim?.message}</p>
-      </div>
-      {/* lanjutkan semua input: provinsi, kota, kecamatan, penerima, dll. */}
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.header}>Tambah Order</Text>
 
-      <div>
-        <label>Ekspedisi</label>
-        <select {...register("ekspedisi")} value={selectedCourier} onChange={e => setSelectedCourier(e.target.value)}>
-          <option value="">-- Pilih Ekspedisi --</option>
-          {couriers.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-        </select>
-        <p className="text-red-500">{errors.ekspedisi?.message}</p>
-      </div>
+      {/* Provinsi Asal */}
+      <Text>Provinsi Asal</Text>
+      <Picker
+        selectedValue={form.provinsi_asal}
+        onValueChange={(v) => {
+          handleChange("provinsi_asal", v);
+          fetchCities(v, "origin");
+          setCitiesOrigin([]);
+          setDistrictsOrigin([]);
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Provinsi --" value="" />
+        {provinces.map((prov) => (
+          <Picker.Item key={prov.id} label={prov.title} value={prov.id} />
+        ))}
+      </Picker>
 
-      <div>
-        <label>Jenis Layanan</label>
-        <select value={selectedService} onChange={e => {
-          setSelectedService(e.target.value);
-          const svc = services.find(s => s.service === e.target.value);
-          setBiaya(svc?.cost || 0);
-        }}>
-          <option value="">{services.length === 0 ? "Tidak ada layanan" : "Pilih layanan"}</option>
-          {services.map(s => (
-            <option key={s.service} value={s.service}>{s.service} - Rp{s.cost.toLocaleString()} ({s.etd} Hari)</option>
-          ))}
-        </select>
-      </div>
+      {/* Kota Asal */}
+      <Text>Kota Asal</Text>
+      <Picker
+        selectedValue={form.kota_asal}
+        onValueChange={(v) => {
+          handleChange("kota_asal", v);
+          fetchDistricts(v, "origin");
+          setDistrictsOrigin([]);
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Kota --" value="" />
+        {citiesOrigin.map((kota) => (
+          <Picker.Item key={kota.id} label={kota.title} value={kota.id} />
+        ))}
+      </Picker>
 
-      <div>
-        <label>Biaya</label>
-        <input type="text" value={biaya ? biaya.toLocaleString("id-ID") : "-"} readOnly className="form-input" />
-      </div>
+      {/* Kecamatan Asal */}
+      <Text>Kecamatan Asal</Text>
+      <Picker
+        selectedValue={form.kecamatan_asal}
+        onValueChange={(v) => handleChange("kecamatan_asal", v)}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Kecamatan --" value="" />
+        {districtsOrigin.map((dist) => (
+          <Picker.Item key={dist.id} label={dist.title} value={dist.id} />
+        ))}
+      </Picker>
 
-      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg">Dapatkan No. Resi</button>
-    </form>
+      {/* Provinsi Tujuan */}
+      <Text>Provinsi Tujuan</Text>
+      <Picker
+        selectedValue={form.provinsi_tujuan}
+        onValueChange={(v) => {
+          handleChange("provinsi_tujuan", v);
+          fetchCities(v, "destination");
+          setCitiesDestination([]);
+          setDistrictsDestination([]);
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Provinsi --" value="" />
+        {provinces.map((prov) => (
+          <Picker.Item key={prov.id} label={prov.title} value={prov.id} />
+        ))}
+      </Picker>
+
+      {/* Kota Tujuan */}
+      <Text>Kota Tujuan</Text>
+      <Picker
+        selectedValue={form.kota_tujuan}
+        onValueChange={(v) => {
+          handleChange("kota_tujuan", v);
+          fetchDistricts(v, "destination");
+          setDistrictsDestination([]);
+        }}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Kota --" value="" />
+        {citiesDestination.map((kota) => (
+          <Picker.Item key={kota.id} label={kota.title} value={kota.id} />
+        ))}
+      </Picker>
+
+      {/* Kecamatan Tujuan */}
+      <Text>Kecamatan Tujuan</Text>
+      <Picker
+        selectedValue={form.kecamatan_tujuan}
+        onValueChange={(v) => handleChange("kecamatan_tujuan", v)}
+        style={styles.picker}
+      >
+        <Picker.Item label="-- Pilih Kecamatan --" value="" />
+        {districtsDestination.map((dist) => (
+          <Picker.Item key={dist.id} label={dist.title} value={dist.id} />
+        ))}
+      </Picker>
+
+      {/* Input lainnya */}
+      <TextInput
+        style={styles.input}
+        placeholder="Nama Pengirim"
+        value={form.nama_pengirim}
+        onChangeText={(v) => handleChange("nama_pengirim", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Alamat Pengirim"
+        value={form.alamat_pengirim}
+        onChangeText={(v) => handleChange("alamat_pengirim", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="No. Telp Pengirim"
+        value={form.no_telp_pengirim}
+        onChangeText={(v) => handleChange("no_telp_pengirim", v)}
+        keyboardType="phone-pad"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Nama Penerima"
+        value={form.nama_penerima}
+        onChangeText={(v) => handleChange("nama_penerima", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Alamat Penerima"
+        value={form.alamat_penerima}
+        onChangeText={(v) => handleChange("alamat_penerima", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="No. Telp Penerima"
+        value={form.no_telp_penerima}
+        onChangeText={(v) => handleChange("no_telp_penerima", v)}
+        keyboardType="phone-pad"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Jenis Barang"
+        value={form.jenis_barang}
+        onChangeText={(v) => handleChange("jenis_barang", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Berat Barang (Kg)"
+        value={form.berat_barang}
+        onChangeText={(v) => handleChange("berat_barang", v)}
+        keyboardType="numeric"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Ekspedisi (misal: JNE, TIKI, POS)"
+        value={form.ekspedisi}
+        onChangeText={(v) => handleChange("ekspedisi", v)}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Jenis Layanan"
+        value={form.jenis_layanan}
+        onChangeText={(v) => handleChange("jenis_layanan", v)}
+      />
+
+      <Button title="Simpan" onPress={handleSubmit} />
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 20,
+    backgroundColor: "#fff",
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#333",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  picker: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+});

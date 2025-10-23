@@ -1,0 +1,205 @@
+import React, { useEffect, useRef, useState } from "react";
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, StyleSheet } from "react-native";
+import axios from "axios";
+import Swal from "sweetalert2"; // hanya jalan di web
+import * as FileSystem from "expo-file-system";
+import Icon from "react-native-vector-icons/FontAwesome"; // pakai vector icons
+import Fomm from "../app/formm";
+
+// ---- Typings ----
+interface Input {
+  id: number;
+  nama_pengirim: string;
+  alamat_pengirim: string;
+  no_telp_pengirim: string;
+  nama_penerima: string;
+  alamat_penerima: string;
+  no_telp_penerima: string;
+  jenis_barang: string;
+  berat_barang: number;
+  ekspedisi: string;
+  jenis_layanan: string;
+  no_resi: string;
+  biaya: number;
+  status: string;
+  status_pembayaran?: string;
+  payment_at?: string;
+}
+
+// ---- Komponen tabel versi FlatList ----
+const PaginateTable = React.forwardRef(
+  (
+    { input = "" }: { input?: string },
+    ref: any
+  ) => {
+    const [data, setData] = useState<Input[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    const fetchData = async () => {
+      if (!input) return;
+      try {
+        setLoading(true);
+        const res = await axios.get(input);
+        const result = Array.isArray(res.data)
+          ? res.data
+          : res.data.data ?? [];
+        setData(result);
+      } catch (err) {
+        console.error("Gagal load data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    React.useImperativeHandle(ref, () => ({
+      refetch: fetchData,
+    }));
+
+    useEffect(() => {
+      fetchData();
+    }, [input]);
+
+    const renderItem = ({ item }: { item: Input }) => (
+      <View style={styles.row}>
+        <Text style={styles.cell}>{item.id}</Text>
+        <Text style={styles.cell}>{item.nama_pengirim}</Text>
+        <Text style={styles.cell}>{item.nama_penerima}</Text>
+        <Text style={styles.cell}>{item.no_resi}</Text>
+        <Text style={styles.cell}>{item.status}</Text>
+      </View>
+    );
+
+    if (loading) return <ActivityIndicator style={{ margin: 20 }} />;
+
+    if (data.length === 0)
+      return <Text style={{ textAlign: "center", margin: 20 }}>Tidak ada data</Text>;
+
+    return (
+      <FlatList
+        data={data}
+        keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={() => (
+          <View style={[styles.row, styles.header]}>
+            <Text style={styles.headerText}>No</Text>
+            <Text style={styles.headerText}>Pengirim</Text>
+            <Text style={styles.headerText}>Penerima</Text>
+            <Text style={styles.headerText}>No Resi</Text>
+            <Text style={styles.headerText}>Status</Text>
+          </View>
+        )}
+        renderItem={renderItem}
+      />
+    );
+  }
+);
+
+const InputOrders: React.FC = () => {
+  const paginateRef = useRef<any>(null);
+  const [loadingCity, setLoadingCity] = useState(false);
+
+  const refresh = () => paginateRef.current?.refetch?.();
+
+  const downloadReceipt = async (noResi: string) => {
+    try {
+      setLoadingCity(true);
+      const uri = `/download-resi/${noResi}`;
+      const fileUri = FileSystem.documentDirectory + `struk-${noResi}.pdf`;
+      const { uri: localUri } = await FileSystem.downloadAsync(uri, fileUri);
+      console.log("File downloaded to:", localUri);
+      // Swal hanya jalan di web; di mobile ganti Alert.alert
+      Swal.fire("Berhasil", "Struk berhasil diunduh", "success");
+    } catch (error) {
+      console.error("Download gagal:", error);
+      Swal.fire("Error", "Gagal mengunduh struk", "error");
+    } finally {
+      setLoadingCity(false);
+    }
+  };
+
+  const redirectToPayment = async (id: number) => {
+    // ⚠️ Midtrans Snap tidak bisa langsung di React Native
+    console.log("Payment clicked for id:", id);
+  };
+
+  useEffect(() => {
+    // Snap.js tidak relevan di RN, jadi tidak dimasukkan
+  }, []);
+
+  return (
+    <View style={styles.card}>
+      {/* Header */}
+      <View style={styles.headerBar}>
+        <Text style={styles.title}>Halaman Data Input</Text>
+
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => {
+            // contoh: navigasi ke Formm screen
+            console.log("Go to Formm");
+          }}
+        >
+          <Text style={styles.addButtonText}>Tambah</Text>
+          <Icon name="plus" size={16} color="#fff" style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Body */}
+      <PaginateTable ref={paginateRef} input="/input" />
+
+      {/* Form di bawah tabel */}
+      <Fomm loadingCity={loadingCity} />
+    </View>
+  );
+};
+
+export default InputOrders;
+
+// ---- Styles ----
+const styles = StyleSheet.create({
+  card: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 16,
+  },
+  headerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  addButton: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0d6efd",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  row: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  cell: {
+    flex: 1,
+    paddingHorizontal: 4,
+    fontSize: 14,
+  },
+  header: {
+    backgroundColor: "#eee",
+  },
+  headerText: {
+    flex: 1,
+    fontWeight: "bold",
+    paddingHorizontal: 4,
+  },
+});

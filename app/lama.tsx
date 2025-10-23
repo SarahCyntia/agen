@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Data from "./data";
+import Input from "./agen/input";
 import Dashboard from "./dashboard";
-import Input from "./input";
+import Data from "./data";
 import Logout from "./logout";
 
 export default function HomeScreen() {
